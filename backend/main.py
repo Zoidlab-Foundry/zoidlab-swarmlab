@@ -17,6 +17,7 @@ import llm
 import swarm_engine
 import exporter
 import foundry
+import jobs
 import seed_swarm
 from auth import session, require_pro, relay_key, entitlement
 
@@ -24,6 +25,10 @@ from auth import session, require_pro, relay_key, entitlement
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init()
+    jobs.init()
+    interrupted = jobs.reconcile()
+    if interrupted:
+        print(f"[swarmlab] reconciled {interrupted} interrupted job(s)")
     n = seed_swarm.run()
     if n:
         print(f"[swarmlab] seeded {n} demo swarms")
@@ -155,16 +160,41 @@ async def run_swarm(body: RunBody, request: Request, owner: str = Depends(requir
                             "error": "TrustGate blocked: " + "; ".join(pf.get("reasons") or [])})
         return db.get_run(rid, owner)
     rid = db.create_run(swarm, body.task_input, model, owner, corr)
-    llm.set_relay_auth(relay_key(request))
-    res = await swarm_engine.run(swarm, body.task_input, model, body.max_steps or swarm.get("max_steps"),
-                                 relay_key=relay_key(request))
-    db.finish_run(rid, res)
-    try:
-        await foundry.emit_spend(res.get("usage"), resource_id=rid, feature=swarm.get("name"),
-                                 correlation_id=corr, environment="development")
-    except Exception:
-        pass
-    return db.get_run(rid, owner)
+    rk = relay_key(request)
+    llm.set_relay_auth(rk)
+    steps = body.max_steps or swarm.get("max_steps")
+
+    async def runner():
+        res = await swarm_engine.run(swarm, body.task_input, model, steps, relay_key=rk)
+        try:
+            await foundry.emit_spend(res.get("usage"), resource_id=rid, feature=swarm.get("name"),
+                                     correlation_id=corr, environment="development")
+        except Exception:
+            pass
+        return res
+
+    job = jobs.submit(owner, "swarm_run", rid, runner,
+                      on_result=lambda res: db.finish_run(rid, res), timeout_s=240)
+    return {"job_id": job["id"], "run_id": rid, "status": job["status"], "run": db.get_run(rid, owner)}
+
+
+# --- jobs ---
+@app.get("/api/jobs/{jid}")
+def get_job(jid: str, request: Request, owner: str = Depends(require_owner)):
+    j = jobs.get(jid, owner)
+    if not j:
+        raise HTTPException(404, "not_found")
+    return j
+
+
+@app.get("/api/jobs")
+def list_jobs(request: Request, owner: str = Depends(require_owner)):
+    return {"jobs": jobs.list_jobs(owner)}
+
+
+@app.post("/api/jobs/{jid}/cancel")
+def cancel_job(jid: str, request: Request, owner: str = Depends(require_owner)):
+    return {"ok": jobs.cancel(jid, owner)}
 
 
 @app.get("/api/runs")

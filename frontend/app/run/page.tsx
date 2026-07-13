@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { api, usd, ms } from "../../lib/api";
+import { api, usd, ms, runToCompletion } from "../../lib/api";
 import { Trace, FinalOutput } from "../../components/Trace";
 
 function RunInner() {
@@ -12,6 +12,7 @@ function RunInner() {
   const [swarmId, setSwarmId] = useState(params.get("swarm") || "");
   const [task, setTask] = useState("");
   const [running, setRunning] = useState(false);
+  const [phase, setPhase] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -24,12 +25,16 @@ function RunInner() {
 
   async function run() {
     if (!swarmId || !task.trim()) return;
-    setRunning(true); setErr(null); setResult(null);
+    setRunning(true); setErr(null); setResult(null); setPhase("queued");
     try {
-      const r = await api.run({ swarm_id: swarmId, task_input: task.trim() });
+      const r = await runToCompletion(
+        () => api.run({ swarm_id: swarmId, task_input: task.trim() }),
+        (rid) => api.getRun(rid),
+        (s) => setPhase(s),
+      );
       setResult(r);
     } catch (e: any) { setErr(e.message || "run failed"); }
-    finally { setRunning(false); }
+    finally { setRunning(false); setPhase(null); }
   }
 
   return (
