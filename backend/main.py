@@ -12,13 +12,14 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 
-import database as db
+import db_pg as db
 import llm
 import swarm_engine
 import exporter
 import foundry
 import jobs
 import seed_swarm
+from tasks import run_swarm as run_swarm_task
 from auth import session, require_pro, relay_key, entitlement
 
 
@@ -161,21 +162,12 @@ async def run_swarm(body: RunBody, request: Request, owner: str = Depends(requir
         return db.get_run(rid, owner)
     rid = db.create_run(swarm, body.task_input, model, owner, corr)
     rk = relay_key(request)
-    llm.set_relay_auth(rk)
     steps = body.max_steps or swarm.get("max_steps")
-
-    async def runner():
-        res = await swarm_engine.run(swarm, body.task_input, model, steps, relay_key=rk)
-        try:
-            await foundry.emit_spend(res.get("usage"), resource_id=rid, feature=swarm.get("name"),
-                                     correlation_id=corr, environment="development")
-        except Exception:
-            pass
-        return res
-
-    job = jobs.submit(owner, "swarm_run", rid, runner,
-                      on_result=lambda res: db.finish_run(rid, res), timeout_s=240)
-    return {"job_id": job["id"], "run_id": rid, "status": job["status"], "run": db.get_run(rid, owner)}
+    job_id = jobs.create(owner, "swarm_run", rid, timeout_s=240)
+    async_res = run_swarm_task.delay(job_id, rid, swarm["id"], body.task_input, model, steps, owner, corr, rk,
+                                     request.cookies.get("zb_session"))
+    jobs.set_celery(job_id, owner, async_res.id)
+    return {"job_id": job_id, "run_id": rid, "status": "queued", "run": db.get_run(rid, owner)}
 
 
 # --- jobs ---

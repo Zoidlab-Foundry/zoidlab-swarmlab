@@ -1,6 +1,6 @@
 """Seed SwarmLab with demo swarms (real agent + typed-handoff definitions).
 No runs are seeded — runs come only from real relay orchestration the user triggers."""
-import database as db
+import db_pg as db
 
 _SWARMS = [
     {"name": "Research → Write → Critique",
