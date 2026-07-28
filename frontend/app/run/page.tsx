@@ -67,7 +67,7 @@ function RunInner() {
         <label className="mt-4 block"><span className="text-[12px] text-dim">Task</span>
           <textarea value={task} onChange={(e) => setTask(e.target.value)} rows={3} placeholder="What should the swarm work on?" className={inp} /></label>
 
-        <button onClick={run} disabled={running || !swarmId || !task.trim()}
+        <button data-assist="run-swarm" onClick={run} disabled={running || !swarmId || !task.trim()}
           className="mt-4 w-full rounded-lg bg-vi px-4 py-2.5 text-[13px] font-semibold text-black hover:opacity-90 disabled:opacity-40">
           {running ? "Orchestrating agents…" : "Run swarm →"}
         </button>

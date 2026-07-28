@@ -51,7 +51,7 @@ export default function SwarmsPage() {
           <h1 className="text-[22px] font-semibold">Swarms</h1>
           <p className="mt-1 text-[13px] text-dim">A swarm is a set of agents plus a typed handoff graph — who may pass control to whom. The orchestrator enforces those edges at run time.</p>
         </div>
-        <button onClick={() => setOpen(true)} className="rounded-lg bg-vi px-4 py-2 text-[13px] font-semibold text-black hover:opacity-90">New swarm</button>
+        <button data-assist="new-swarm" onClick={() => setOpen(true)} className="rounded-lg bg-vi px-4 py-2 text-[13px] font-semibold text-black hover:opacity-90">New swarm</button>
       </div>
 
       <div className="mt-6 grid gap-3 md:grid-cols-2">
