@@ -11,8 +11,11 @@ Every data endpoint requires Nyquest Pro (fail-closed on the Next middleware AND
 backend). Runs emit SpendGuard usage events and preflight through TrustGate.
 
 ## Layout
-- `backend/` — FastAPI + SQLite. `swarm_engine.py` real relay orchestration with enforced
-  typed handoffs + bounded steps; `database.py` owner-scoped swarms/runs; `main.py` the `/api`.
+- `backend/` — FastAPI + Postgres with per-tenant FORCE row-level security (every query runs as
+  the non-superuser `app_rls` role keyed on `app.current_owner`, so tenant isolation is enforced
+  by the database, not by application code). `swarm_engine.py` real relay orchestration with
+  enforced typed handoffs + bounded steps; `db_pg.py` owner-scoped swarms/runs; `celery_app.py` +
+  `tasks.py` Celery + Redis durable run jobs that survive an API restart; `main.py` the `/api`.
 - `frontend/` — Next 15 + React 19 (amber theme). Dashboard, Swarms (agent + handoff builder),
   Run (trace + final output), Runs (replayable traces).
 
