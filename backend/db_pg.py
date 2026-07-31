@@ -125,7 +125,7 @@ def create_swarm(d, owner):
 
 def update_swarm(sid, owner, d):
     cur_s = get_swarm(sid, owner)
-    if not cur_s or (cur_s.get("owner_user_id") and cur_s["owner_user_id"] != owner):
+    if not cur_s or cur_s.get("owner_user_id") != owner:
         return None
     agents = d.get("agents") if d.get("agents") is not None else cur_s["agents"]
     entry = d.get("entry_agent") or cur_s.get("entry_agent") or (agents[0].get("key") if agents else "")
@@ -139,7 +139,7 @@ def update_swarm(sid, owner, d):
 
 def delete_swarm(sid, owner):
     cur_s = get_swarm(sid, owner)
-    if not cur_s or (cur_s.get("owner_user_id") and cur_s["owner_user_id"] != owner):
+    if not cur_s or cur_s.get("owner_user_id") != owner:
         return False
     with _tx(owner) as cur:
         cur.execute("DELETE FROM swarms WHERE id=%s", (sid,))
